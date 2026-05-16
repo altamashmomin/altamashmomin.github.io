@@ -1,10 +1,11 @@
 /**
  * ARScreen.tsx
- * Camera passthrough + Tesla auth state machine + 2.5 s polling loop.
+ * Camera passthrough + Tesla auth state machine + adaptive polling loop.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AppState,
   Linking,
   StatusBar,
   StyleSheet,
@@ -33,8 +34,9 @@ type AuthState =
   | 'active'
   | 'error';
 
-const POLL_ACTIVE_MS  = 2500;   // fast cadence while car is awake
-const POLL_ASLEEP_MS  = 30000;  // slow cadence after car falls asleep
+const POLL_DRIVING_MS = 5000;   // driving — responsive but not excessive
+const POLL_PARKED_MS  = 30000;  // parked/idle — minimal API usage
+const POLL_ASLEEP_MS  = 60000;  // car asleep (408s) — very conservative
 const SLEEP_THRESHOLD = 3;      // consecutive 408s before backing off
 
 const COLORS = {
@@ -62,6 +64,8 @@ export default function ARScreen() {
   const pollTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sleepStreak = useRef(0);   // consecutive 408 count
   const polling     = useRef(false); // guard against double-starts
+  const lastShift   = useRef<string | null>(null); // track drive state for cadence
+  const activeVid   = useRef<string | null>(null); // vehicle id for resume
 
   // -------------------------------------------------------------------------
   // Camera permission
@@ -84,35 +88,35 @@ export default function ARScreen() {
   const startPolling = useCallback((vid: string) => {
     stopPolling();
     polling.current = true;
+    activeVid.current = vid;
     sleepStreak.current = 0;
 
     const tick = async () => {
       if (!polling.current) return;
 
-      let nextDelay = POLL_ACTIVE_MS;
+      let nextDelay = POLL_DRIVING_MS;
 
       try {
         const data = await api.current.getVehicleData(vid);
-        // Successful response — car is awake, reset streak and use fast cadence
         sleepStreak.current = 0;
-        nextDelay = POLL_ACTIVE_MS;
+        lastShift.current = data.shiftState;
         setVehicleData(data);
+
+        // Adaptive cadence based on driving state
+        const isDriving = data.shiftState === 'D' || data.shiftState === 'R';
+        nextDelay = isDriving ? POLL_DRIVING_MS : POLL_PARKED_MS;
       } catch (e: any) {
         const status = e?.response?.status ?? 0;
         if (status === 408) {
           sleepStreak.current += 1;
           if (sleepStreak.current >= SLEEP_THRESHOLD) {
-            // Car has been asleep for a while — back off to slow cadence
             nextDelay = POLL_ASLEEP_MS;
-            console.log('[TeslaHUD] car asleep, backing off to', POLL_ASLEEP_MS / 1000, 's cadence');
           } else {
-            // First couple of 408s — still try at normal speed before backing off
-            nextDelay = POLL_ACTIVE_MS;
-            console.log('[TeslaHUD] car asleep (408), streak:', sleepStreak.current);
+            nextDelay = POLL_PARKED_MS;
           }
         } else {
           console.log('[TeslaHUD] poll error — status:', status, e?.message);
-          nextDelay = POLL_ACTIVE_MS;
+          nextDelay = POLL_PARKED_MS;
         }
       }
 
@@ -121,13 +125,26 @@ export default function ARScreen() {
       }
     };
 
-    // Kick off the first tick immediately
     pollTimer.current = setTimeout(tick, 0);
   }, [stopPolling]);
 
   useEffect(() => {
     return () => stopPolling();
   }, [stopPolling]);
+
+  // -------------------------------------------------------------------------
+  // AppState — pause polling when backgrounded, resume when foregrounded
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && activeVid.current && !polling.current) {
+        startPolling(activeVid.current);
+      } else if (state !== 'active' && polling.current) {
+        stopPolling();
+      }
+    });
+    return () => sub.remove();
+  }, [startPolling, stopPolling]);
 
   // -------------------------------------------------------------------------
   // Vehicle init (called after successful auth or token restore)

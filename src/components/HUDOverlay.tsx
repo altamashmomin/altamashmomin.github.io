@@ -10,7 +10,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -28,17 +27,17 @@ const C = {
   bg:       'rgba(5, 8, 15, 0.60)',
   panel:    'rgba(5, 8, 15, 0.72)',
   border:   'rgba(0, 212, 255, 0.18)',
-  cyan:     '#00d4ff',
-  amber:    '#ff9d00',
-  green:    '#00ff88',
-  red:      '#ff3b30',
-  muted:    '#2e4a64',
+  cyan:     '#4ee0ff',
+  amber:    '#ffb340',
+  green:    '#50ffa0',
+  red:      '#ff5a50',
+  muted:    '#6a8fad',
   white:    '#ffffff',
-  dimWhite: 'rgba(255,255,255,0.75)',
+  dimWhite: 'rgba(255,255,255,0.92)',
 };
 
 const FONTS = {
-  display: 'Orbitron-Bold',
+  display: 'ShareTechMono-Regular',
   displayBlack: 'Orbitron-Black',
   mono: 'ShareTechMono-Regular',
 };
@@ -154,8 +153,8 @@ export default function HUDOverlay({ data }: Props) {
           height:        H,
           paddingLeft:   Math.max(insets.left,  sw(16)),
           paddingRight:  Math.max(insets.right, sw(16)),
-          paddingTop:    Math.max(insets.top,   sh(10)),
-          paddingBottom: Math.max(insets.bottom, sh(10)),
+          paddingTop:    Math.max(insets.top,   sh(20)),
+          paddingBottom: Math.max(insets.bottom, sh(20)),
         },
       ]}
     >
@@ -170,20 +169,24 @@ export default function HUDOverlay({ data }: Props) {
         </View>
       )}
 
-      {/* ── Mode switcher ──────────────────────────────────── */}
+      {/* ── Mode tabs ──────────────────────────────────── */}
       <View style={[styles.modeSwitcher, {
-        bottom: Math.max(insets.bottom + sh(8),  sh(18)),
-        right:  Math.max(insets.right  + sw(10), sw(20)),
+        bottom: Math.max(insets.bottom + sh(8), sh(18)),
+        left: sw(8),
+        right: sw(8),
       }]}>
-        {MODES.map(m => (
+        {MODES.map((m, i) => (
           <TouchableOpacity
             key={m}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
             onPress={() => setMode(m)}
-            style={styles.modeBtnOuter}
+            style={[
+              styles.modeTab,
+              mode === m && styles.modeTabActive,
+              { flex: i === 1 ? 1.05 : 1 },
+            ]}
           >
-            <View style={[styles.modeDot, mode === m && styles.modeDotActive]} />
-            <Text style={[styles.modeLabel, mode === m && styles.modeLabelActive]}>
+            <Text style={[styles.modeTabLabel, mode === m && styles.modeTabLabelActive]}>
               {m.toUpperCase()}
             </Text>
           </TouchableOpacity>
@@ -259,6 +262,8 @@ export default function HUDOverlay({ data }: Props) {
 // ===========================================================================
 // MINIMAL MODE
 // ===========================================================================
+const MAX_SPEED_MPH = 160;
+
 interface MinimalProps {
   speed: number;
   battery: number;
@@ -267,26 +272,44 @@ interface MinimalProps {
 }
 
 function MinimalMode({ speed, battery, range, battColor }: MinimalProps) {
+  const speedPct = Math.min(100, (speed / MAX_SPEED_MPH) * 100);
+
   return (
     <View style={styles.minimalRoot}>
-      {/* Big speed */}
-      <View style={styles.minimalCenter}>
+      {/* Speed card with shadow */}
+      <View style={styles.minimalSpeedCard}>
         <Text style={styles.speedBig}>{Math.round(speed)}</Text>
         <Text style={styles.speedUnit}>MPH</Text>
+        {/* Speed bar */}
+        <View style={styles.minimalSpeedBarTrack}>
+          <View
+            style={[
+              styles.minimalSpeedBarFill,
+              { width: `${speedPct}%` as any },
+            ]}
+          />
+        </View>
       </View>
 
-      {/* Battery + range strip */}
-      <View style={styles.minimalBottom}>
-        <View style={styles.row}>
+      {/* Battery bar — full width below speed card */}
+      <View style={styles.minimalBattSection}>
+        <View style={styles.minimalBattRow}>
           <Text style={[styles.minimalBig, { color: battColor }]}>
             {battery}
             <Text style={styles.minimalUnit}>%</Text>
           </Text>
-          <BatteryBar pct={battery} color={battColor} width={sw(180)} />
           <Text style={[styles.minimalBig, { color: C.cyan }]}>
             {Math.round(range)}
             <Text style={styles.minimalUnit}> mi</Text>
           </Text>
+        </View>
+        <View style={styles.minimalBattTrack}>
+          <View
+            style={[
+              styles.minimalBattFill,
+              { width: `${Math.min(100, battery)}%` as any, backgroundColor: battColor },
+            ]}
+          />
         </View>
       </View>
     </View>
@@ -510,26 +533,11 @@ function TechMode({
             l2="A/C" v2={isClimateOn ? 'ON' : 'OFF'} c2={isClimateOn ? C.green : C.muted} h2="A/C"
             onHelp={onHelp}
           />
-          <TwinRow
-            l1="SHL" v1={heatStr(seatHeaterLeft)}  c1={seatHeaterLeft  > 0 ? C.amber : C.muted} h1="SHL"
-            l2="SHR" v2={heatStr(seatHeaterRight)} c2={seatHeaterRight > 0 ? C.amber : C.muted} h2="SHR"
-            onHelp={onHelp}
-          />
-          <DataRow label="CAM"    value={dashcamState ?? '--'}
-                                  helpKey="CAM"    onHelp={onHelp} />
         </Panel>
 
       </View>
 
       {/* ── Bottom strip: live dot + odometer + efficiency chart ───── */}
-      <View style={styles.techBottom}>
-        <View style={[styles.liveDot, { opacity: livePulse && hasData ? 1 : 0, marginRight: s(2) }]} />
-        <Text style={styles.liveLabel}>LIVE</Text>
-        <Text style={[styles.label, { color: C.muted, flex: 1, marginLeft: s(12) }]}>
-          ODO {odometer.toLocaleString()} mi
-        </Text>
-        <EfficiencyChart samples={chartSamples} />
-      </View>
 
       {/* ── Tooltip modal ────────────────────────────────────────────── */}
       <TooltipModal helpKey={tooltipKey} onClose={() => setTooltipKey(null)} />
@@ -682,246 +690,282 @@ function CarSchematic({
   sentryMode: boolean;
   isClimateOn: boolean;
 }) {
-  // ── Body dimensions ───────────────────────────────────────────
-  const BODY_W = sw(76);
-  const BODY_H = sh(124);
-  const FR     = BODY_W / 2;   // front corner radius = full semi-circle → pointed nose
-  const RR     = sw(22);       // rear corner radius  = wider/blunter tail
-  const TIRE_W = sw(13);
-  const TIRE_H = sh(28);
-  const OVL    = sw(4);        // tire overlaps body edge
-  const MIR_W  = sw(12);      // mirror width — larger, like real M3
-  const MIR_H  = sh(8);
-  const BX     = TIRE_W - OVL;
-  const TOTAL_W = BX + BODY_W + BX;
-  const BY     = sh(14);
-  const TOTAL_H = BY + BODY_H + sh(14);
+  const LINE = 'rgba(255,255,255,0.55)';
+  const GLASS = 'rgba(255,255,255,0.12)';
+  const FILL = 'rgba(255,255,255,0.04)';
 
-  // ── Glass zones (inside body, top = front) ────────────────────
-  const HOOD_H = sh(16);   // hood / frunk cap — clipped to pointed nose by FR
-  const FG_H   = sh(21);   // windshield — brighter tint
-  const RF_H   = sh(50);   // panoramic glass roof
-  const RG_H   = sh(15);   // rear fastback glass
-  // trunk = remainder, clipped to blunter tail by RR
+  // Overall container
+  const W = sw(130);
+  const H = sh(180);
 
-  // ── Axle Y positions in CONTAINER coords ─────────────────────
-  const TIRE_FY = BY + HOOD_H + Math.round(FG_H * 0.50) - Math.round(TIRE_H / 2);
-  const TIRE_RY = BY + HOOD_H + FG_H + RF_H + Math.round(RG_H * 0.38) - Math.round(TIRE_H / 2);
+  // Body outline
+  const BW = sw(52);
+  const BH = sh(140);
+  const BX = (W - BW) / 2;
+  const BY = sh(20);
 
-  // ── Side mirror Y: sits at A-pillar (junction of windshield) ──
-  const MIR_Y = BY + HOOD_H + sh(5);
+  // Nose and tail radii
+  const NOSE_R = BW / 2;
+  const TAIL_R = sw(18);
 
-  // ── B-pillar Y within the panoramic roof zone (% down the roof) ─
-  const BPIL_Y = HOOD_H + FG_H + Math.round(RF_H * 0.46);
+  // Section heights (top to bottom inside body)
+  const HOOD = sh(20);
+  const WSHIELD = sh(18);
+  const ROOF = sh(52);
+  const RGLASS = sh(16);
+  // trunk = remainder
 
-  const tireColor = (p: number): string =>
-    p === 0 ? 'rgba(46,74,100,0.22)' : p >= 32 && p <= 38 ? 'rgba(200,200,200,0.92)' : C.amber;
-  const tireTxtColor = (p: number): string =>
-    p === 0 ? C.muted : '#111';
+  // Tire dimensions
+  const TW = sw(8);
+  const TH = sh(22);
+  const T_GAP = sw(3);
 
-  // Thin section divider line (in local body coords)
-  const divider = (top: number, inset = sw(8)) => (
-    <View style={{
-      position: 'absolute',
-      top, left: inset, right: inset,
-      height: 1,
-      backgroundColor: 'rgba(0,212,255,0.42)',
-    }} />
-  );
+  // Axle Y positions
+  const F_AXLE = BY + HOOD + WSHIELD * 0.4;
+  const R_AXLE = BY + HOOD + WSHIELD + ROOF + RGLASS * 0.5;
+
+  // Mirror
+  const MIR_W = sw(10);
+  const MIR_H = sh(5);
+  const MIR_Y = BY + HOOD + sh(2);
+
+  // Door line positions (Y inside body)
+  const DOOR_FL_Y = HOOD + WSHIELD + sh(2);
+  const DOOR_RL_Y = HOOD + WSHIELD + ROOF * 0.48;
+
+  const tireColor = (p: number) =>
+    p === 0 ? C.muted : p >= 30 && p <= 42 ? C.white : C.amber;
 
   return (
-    <View style={{ width: TOTAL_W, height: TOTAL_H, alignSelf: 'center' }}>
+    <View style={{ width: W, height: H, alignSelf: 'center' }}>
 
-      {/* ── FRUNK OPEN badge ──────────────────────────────────── */}
+      {/* ── BODY SHELL ─────────────────────────────────────── */}
+      <View style={{
+        position: 'absolute',
+        left: BX, top: BY,
+        width: BW, height: BH,
+        borderTopLeftRadius: NOSE_R,
+        borderTopRightRadius: NOSE_R,
+        borderBottomLeftRadius: TAIL_R,
+        borderBottomRightRadius: TAIL_R,
+        backgroundColor: FILL,
+        borderWidth: 1,
+        borderColor: LINE,
+        overflow: 'hidden',
+      }}>
+
+        {/* Hood line */}
+        <View style={{ position: 'absolute', top: HOOD, left: sw(4), right: sw(4), height: 0.5, backgroundColor: LINE }} />
+
+        {/* Windshield */}
+        <View style={{
+          position: 'absolute', top: HOOD, left: 0, right: 0,
+          height: WSHIELD,
+          backgroundColor: GLASS,
+        }} />
+
+        {/* Windshield bottom line */}
+        <View style={{ position: 'absolute', top: HOOD + WSHIELD, left: sw(2), right: sw(2), height: 0.5, backgroundColor: LINE }} />
+
+        {/* Roof glass panel */}
+        <View style={{
+          position: 'absolute',
+          top: HOOD + WSHIELD + sh(4),
+          left: sw(5), right: sw(5),
+          height: ROOF - sh(8),
+          borderWidth: 0.5,
+          borderColor: 'rgba(255,255,255,0.25)',
+          borderRadius: s(2),
+          backgroundColor: 'rgba(255,255,255,0.03)',
+        }} />
+
+        {/* Centre roof spine */}
+        <View style={{
+          position: 'absolute',
+          top: HOOD + WSHIELD + sh(4),
+          left: BW / 2 - 0.25,
+          width: 0.5,
+          height: ROOF - sh(8),
+          backgroundColor: 'rgba(255,255,255,0.18)',
+        }} />
+
+        {/* B-pillar line (door divider) */}
+        <View style={{
+          position: 'absolute',
+          top: DOOR_RL_Y,
+          left: 0, right: 0,
+          height: 0.5,
+          backgroundColor: 'rgba(255,255,255,0.20)',
+        }} />
+
+        {/* Left door lines */}
+        <View style={{
+          position: 'absolute',
+          top: DOOR_FL_Y, left: 0,
+          width: 0.5, height: DOOR_RL_Y - DOOR_FL_Y,
+          backgroundColor: 'rgba(255,255,255,0.15)',
+        }} />
+        <View style={{
+          position: 'absolute',
+          top: DOOR_RL_Y, left: 0,
+          width: 0.5, height: sh(22),
+          backgroundColor: 'rgba(255,255,255,0.15)',
+        }} />
+
+        {/* Right door lines */}
+        <View style={{
+          position: 'absolute',
+          top: DOOR_FL_Y, right: 0,
+          width: 0.5, height: DOOR_RL_Y - DOOR_FL_Y,
+          backgroundColor: 'rgba(255,255,255,0.15)',
+        }} />
+        <View style={{
+          position: 'absolute',
+          top: DOOR_RL_Y, right: 0,
+          width: 0.5, height: sh(22),
+          backgroundColor: 'rgba(255,255,255,0.15)',
+        }} />
+
+        {/* Rear glass */}
+        <View style={{
+          position: 'absolute',
+          top: HOOD + WSHIELD + ROOF,
+          left: 0, right: 0,
+          height: RGLASS,
+          backgroundColor: GLASS,
+        }} />
+
+        {/* Rear glass top line */}
+        <View style={{ position: 'absolute', top: HOOD + WSHIELD + ROOF, left: sw(2), right: sw(2), height: 0.5, backgroundColor: LINE }} />
+
+        {/* Trunk line */}
+        <View style={{ position: 'absolute', top: HOOD + WSHIELD + ROOF + RGLASS, left: sw(4), right: sw(4), height: 0.5, backgroundColor: LINE }} />
+
+        {/* Status overlay in center */}
+        <View style={{
+          position: 'absolute',
+          top: HOOD + WSHIELD + sh(6),
+          left: 0, right: 0,
+          alignItems: 'center', gap: s(2),
+        }}>
+          <Text style={{ fontSize: sf(11) }}>{locked ? '🔒' : '🔓'}</Text>
+          {sentryMode && (
+            <Text style={{ fontFamily: FONTS.mono, fontSize: sf(6), color: C.amber, letterSpacing: 1 }}>SNTRY</Text>
+          )}
+          {isClimateOn && (
+            <Text style={{ fontFamily: FONTS.mono, fontSize: sf(6), color: C.cyan, letterSpacing: 1 }}>A/C</Text>
+          )}
+        </View>
+      </View>
+
+      {/* ── SIDE MIRRORS ──────────────────────────────────── */}
+      <View style={{
+        position: 'absolute',
+        top: MIR_Y, left: BX - MIR_W + sw(1),
+        width: MIR_W, height: MIR_H,
+        borderTopLeftRadius: MIR_H,
+        borderBottomLeftRadius: s(1),
+        borderTopRightRadius: s(1),
+        borderBottomRightRadius: s(1),
+        borderWidth: 0.5,
+        borderColor: LINE,
+        backgroundColor: FILL,
+      }} />
+      <View style={{
+        position: 'absolute',
+        top: MIR_Y, left: BX + BW - sw(1),
+        width: MIR_W, height: MIR_H,
+        borderTopRightRadius: MIR_H,
+        borderBottomRightRadius: s(1),
+        borderTopLeftRadius: s(1),
+        borderBottomLeftRadius: s(1),
+        borderWidth: 0.5,
+        borderColor: LINE,
+        backgroundColor: FILL,
+      }} />
+
+      {/* ── DOOR HANDLES (small ticks) ────────────────────── */}
+      {[DOOR_FL_Y + sh(8), DOOR_RL_Y + sh(8)].map((dy, i) => (
+        <React.Fragment key={`dh${i}`}>
+          <View style={{
+            position: 'absolute',
+            top: BY + dy, left: BX - sw(1),
+            width: sw(3), height: sh(2),
+            backgroundColor: 'rgba(255,255,255,0.3)',
+            borderRadius: 1,
+          }} />
+          <View style={{
+            position: 'absolute',
+            top: BY + dy, left: BX + BW - sw(2),
+            width: sw(3), height: sh(2),
+            backgroundColor: 'rgba(255,255,255,0.3)',
+            borderRadius: 1,
+          }} />
+        </React.Fragment>
+      ))}
+
+      {/* ── TIRES + PSI LABELS ────────────────────────────── */}
+      {(['fl', 'fr', 'rl', 'rr'] as const).map(key => {
+        const isLeft = key[1] === 'l';
+        const isFront = key[0] === 'f';
+        const psi = tires[key];
+        const axleY = isFront ? F_AXLE : R_AXLE;
+        const tireX = isLeft ? BX - TW - T_GAP : BX + BW + T_GAP;
+        const tireY = axleY - TH / 2;
+        const col = tireColor(psi);
+
+        return (
+          <React.Fragment key={key}>
+            {/* Tire rectangle */}
+            <View style={{
+              position: 'absolute',
+              top: tireY, left: tireX,
+              width: TW, height: TH,
+              backgroundColor: psi === 0 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.25)',
+              borderRadius: s(2),
+              borderWidth: 0.5,
+              borderColor: psi === 0 ? 'rgba(255,255,255,0.15)' : LINE,
+            }} />
+
+            {/* PSI label — outside the tire */}
+            <View style={{
+              position: 'absolute',
+              top: tireY + TH / 2 - sh(7),
+              left: isLeft ? tireX - sw(42) : tireX + TW + sw(23),
+              width: sw(20),
+              alignItems: isLeft ? 'flex-end' as const : 'flex-start' as const,
+            }}>
+              <Text style={{
+                fontFamily: FONTS.mono,
+                fontSize: sf(11.25),
+                color: col,
+                fontWeight: '600',
+              }}>
+                {psi > 0 ? psi : '--'}
+              </Text>
+            </View>
+          </React.Fragment>
+        );
+      })}
+
+      {/* ── FRUNK badge ──────────────────────────────────── */}
       {frunkOpen && (
-        <View style={[styles.schOpenBadge, { position: 'absolute', top: 0, left: TOTAL_W / 2 - sw(22) }]}>
+        <View style={[styles.schOpenBadge, { position: 'absolute', top: sh(4), left: W / 2 - sw(18) }]}>
           <Text style={styles.schOpenText}>▲ FRUNK</Text>
         </View>
       )}
 
-      {/* ── BODY ─────────────────────────────────────────────────
-          Asymmetric pill: pointed nose (FR = BODY_W/2) at top,
-          blunter tail (RR = sw(22)) at bottom.
-          overflow:'hidden' clips every child to this silhouette. */}
-      <View style={{
-        position: 'absolute',
-        left: BX, top: BY,
-        width: BODY_W, height: BODY_H,
-        borderTopLeftRadius: FR,
-        borderTopRightRadius: FR,
-        borderBottomLeftRadius: RR,
-        borderBottomRightRadius: RR,
-        backgroundColor: 'rgba(0,212,255,0.07)',
-        borderWidth: 1.5,
-        borderColor: 'rgba(0,212,255,0.50)',
-        overflow: 'hidden',
-      }}>
-
-        {/* HOOD / FRUNK CAP */}
-        <View style={{
-          position: 'absolute', top: 0, left: 0, right: 0,
-          height: HOOD_H,
-          backgroundColor: 'rgba(0,212,255,0.16)',
-        }} />
-        {divider(HOOD_H)}
-
-        {/* WINDSHIELD — bright tint, wide pane */}
-        <View style={{
-          position: 'absolute', top: HOOD_H + 1, left: 0, right: 0,
-          height: FG_H,
-          backgroundColor: 'rgba(0,212,255,0.34)',
-        }} />
-        {divider(HOOD_H + FG_H)}
-
-        {/* PANORAMIC GLASS ROOF */}
-        <View style={{
-          position: 'absolute',
-          top: HOOD_H + FG_H + 1, left: 0, right: 0,
-          height: RF_H - 2,
-          backgroundColor: 'rgba(0,212,255,0.04)',
-        }}>
-          {/* Glass pane inset border — shows the actual glass opening */}
-          <View style={{
-            position: 'absolute',
-            top: sh(5), bottom: sh(5),
-            left: sw(7), right: sw(7),
-            borderWidth: 1,
-            borderColor: 'rgba(0,212,255,0.28)',
-            borderRadius: s(3),
-          }} />
-
-          {/* Centre roof rail (structural bar down the spine) */}
-          <View style={{
-            position: 'absolute', top: 0, bottom: 0,
-            left: BODY_W / 2 - 1,
-            width: 2,
-            backgroundColor: 'rgba(0,212,255,0.22)',
-          }} />
-
-          {/* B-pillar — divides front door from rear door zone */}
-          <View style={{
-            position: 'absolute',
-            top: Math.round(RF_H * 0.46),
-            left: 0, right: 0,
-            height: 1,
-            backgroundColor: 'rgba(0,212,255,0.24)',
-          }} />
-
-          {/* Status items centred in roof pane */}
-          <View style={{
-            position: 'absolute', top: sh(5), bottom: sh(5),
-            left: sw(7), right: sw(7),
-            alignItems: 'center', justifyContent: 'center', gap: s(3),
-          }}>
-            <Text style={{ fontSize: sf(13) }}>{locked ? '🔒' : '🔓'}</Text>
-            {sentryMode && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(3) }}>
-                <View style={{ width: s(4), height: s(4), borderRadius: s(2), backgroundColor: C.amber }} />
-                <Text style={{ fontFamily: FONTS.mono, fontSize: sf(7), color: C.amber, letterSpacing: 1 }}>SNTRY</Text>
-              </View>
-            )}
-            {isClimateOn && (
-              <Text style={{ fontFamily: FONTS.mono, fontSize: sf(7), color: C.cyan, letterSpacing: 1 }}>A/C ON</Text>
-            )}
-          </View>
-        </View>
-        {divider(HOOD_H + FG_H + RF_H)}
-
-        {/* REAR FASTBACK GLASS */}
-        <View style={{
-          position: 'absolute',
-          top: HOOD_H + FG_H + RF_H + 1, left: 0, right: 0,
-          height: RG_H,
-          backgroundColor: 'rgba(0,212,255,0.28)',
-        }} />
-        {divider(HOOD_H + FG_H + RF_H + RG_H)}
-
-        {/* TRUNK / rear cap — clips naturally to RR corner radius */}
-        <View style={{
-          position: 'absolute',
-          top: HOOD_H + FG_H + RF_H + RG_H + 1,
-          left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,212,255,0.14)',
-        }} />
-
-      </View>
-
-      {/* ── SIDE MIRRORS ──────────────────────────────────────────
-          Positioned at A-pillar, swept outward away from body.
-          Larger than before — Model 3 mirrors are quite prominent. */}
-      {/* Left mirror */}
-      <View style={{
-        position: 'absolute',
-        top: MIR_Y,
-        left: BX - MIR_W + sw(2),
-        width: MIR_W, height: MIR_H,
-        backgroundColor: 'rgba(0,212,255,0.38)',
-        borderTopLeftRadius: MIR_H / 2,
-        borderBottomLeftRadius: s(2),
-        borderTopRightRadius: s(2),
-        borderBottomRightRadius: s(2),
-      }} />
-      {/* Right mirror */}
-      <View style={{
-        position: 'absolute',
-        top: MIR_Y,
-        left: BX + BODY_W - sw(2),
-        width: MIR_W, height: MIR_H,
-        backgroundColor: 'rgba(0,212,255,0.38)',
-        borderTopRightRadius: MIR_H / 2,
-        borderBottomRightRadius: s(2),
-        borderTopLeftRadius: s(2),
-        borderBottomLeftRadius: s(2),
-      }} />
-
-      {/* ── TIRES ─────────────────────────────────────────────── */}
-      {(['fl', 'fr', 'rl', 'rr'] as const).map(key => {
-        const isLeft  = key[1] === 'l';
-        const isFront = key[0] === 'f';
-        const psi     = tires[key];
-        return (
-          <View
-            key={key}
-            style={{
-              position: 'absolute',
-              top:   isFront ? TIRE_FY : TIRE_RY,
-              left:  isLeft  ? 0 : undefined,
-              right: isLeft  ? undefined : 0,
-              width: TIRE_W, height: TIRE_H,
-              backgroundColor: tireColor(psi),
-              borderRadius: s(4),
-              alignItems: 'center', justifyContent: 'center',
-              opacity: psi === 0 ? 0.28 : 1,
-            }}
-          >
-            <Text style={{
-              fontFamily: FONTS.mono,
-              fontSize: sf(9),
-              color: tireTxtColor(psi),
-              fontWeight: '700',
-            }}>
-              {psi > 0 ? psi : '--'}
-            </Text>
-          </View>
-        );
-      })}
-
-      {/* ── TRUNK OPEN badge ──────────────────────────────────── */}
+      {/* ── TRUNK badge ──────────────────────────────────── */}
       {trunkOpen && (
-        <View style={[styles.schOpenBadge, {
-          position: 'absolute',
-          bottom: 0,
-          left: TOTAL_W / 2 - sw(22),
-        }]}>
+        <View style={[styles.schOpenBadge, { position: 'absolute', bottom: sh(2), left: W / 2 - sw(18) }]}>
           <Text style={styles.schOpenText}>▼ TRUNK</Text>
         </View>
       )}
-
     </View>
   );
 }
 
-// ── Tooltip modal — shown when user taps a ? badge ────────────────────────
+// ── Tooltip overlay — shown when user taps a ? badge ──────────────────────
 function TooltipModal({
   helpKey,
   onClose,
@@ -933,48 +977,37 @@ function TooltipModal({
   if (!info) return null;
 
   return (
-    <Modal
-      transparent
-      animationType="fade"
-      visible={!!info}
-      onRequestClose={onClose}
-      statusBarTranslucent
+    <TouchableOpacity
+      style={styles.modalBackdrop}
+      onPress={onClose}
+      activeOpacity={1}
     >
-      <TouchableOpacity
-        style={styles.modalBackdrop}
-        onPress={onClose}
-        activeOpacity={1}
-      >
-        <View style={styles.modalCard}>
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <View style={styles.helpBadgeLg}>
-              <Text style={styles.helpBadgeLgText}>?</Text>
-            </View>
-            <Text style={styles.modalTitle}>{info.title}</Text>
+      <View style={styles.modalCard}>
+        <View style={styles.modalHeader}>
+          <View style={styles.helpBadgeLg}>
+            <Text style={styles.helpBadgeLgText}>?</Text>
           </View>
-
-          {/* Divider */}
-          <View style={[styles.techDivider, { marginVertical: s(8) }]} />
-
-          {/* Description */}
-          <Text style={styles.modalDesc}>{info.desc}</Text>
-
-          {/* Dismiss */}
-          <TouchableOpacity onPress={onClose} style={styles.modalDismiss}>
-            <Text style={styles.modalDismissText}>DISMISS</Text>
-          </TouchableOpacity>
+          <Text style={styles.modalTitle}>{info.title}</Text>
         </View>
-      </TouchableOpacity>
-    </Modal>
+
+        <View style={[styles.techDivider, { marginVertical: s(8) }]} />
+
+        <Text style={styles.modalDesc}>{info.desc}</Text>
+
+        <TouchableOpacity onPress={onClose} style={styles.modalDismiss}>
+          <Text style={styles.modalDismissText}>DISMISS</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
   );
 }
 
 // ── Power bar (Model 3-style acceleration / regen indicator) ───────────────
-function PowerBar({ power, barWidth }: { power: number; barWidth?: number }) {
+function PowerBar({ power, barWidth, maxKw }: { power: number; barWidth?: number; maxKw?: number }) {
   const BAR_W = barWidth ?? sw(220);
   const BAR_H = sh(6);
-  const pct = Math.min(1, Math.abs(power) / MAX_POWER_KW);
+  const cap = maxKw ?? 150;
+  const pct = Math.min(1, Math.abs(power) / cap);
   const fillW = BAR_W / 2 * pct;
   const isRegen = power < 0;
   const fillColor = isRegen ? C.green : C.cyan;
@@ -1158,31 +1191,31 @@ const styles = StyleSheet.create({
   modeSwitcher: {
     position: 'absolute',
     bottom: sh(18),
-    right: sw(20),
     flexDirection: 'row',
-    gap: s(10),
     alignItems: 'center',
+    paddingHorizontal: sw(8),
+    gap: sw(8),
+    zIndex: 100,
   },
-  modeBtnOuter: {
+  modeTab: {
     alignItems: 'center',
-    gap: s(3),
+    paddingVertical: sh(8),
+    borderRadius: s(12),
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  modeDot: {
-    width: s(6),
-    height: s(6),
-    borderRadius: s(3),
-    backgroundColor: C.muted,
+  modeTabActive: {
+    backgroundColor: 'rgba(0, 212, 255, 0.12)',
+    borderColor: 'rgba(0, 212, 255, 0.4)',
   },
-  modeDotActive: {
-    backgroundColor: C.cyan,
-  },
-  modeLabel: {
+  modeTabLabel: {
     fontFamily: FONTS.mono,
-    fontSize: sf(8),
+    fontSize: sf(11),
     color: C.muted,
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
-  modeLabelActive: {
+  modeTabLabelActive: {
     color: C.cyan,
   },
 
@@ -1318,18 +1351,67 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: sh(10),
   },
-  minimalCenter: {
+  minimalSpeedCard: {
     alignItems: 'center',
-    marginBottom: sh(16),
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: s(24),
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: sw(36),
+    paddingTop: sh(18),
+    paddingBottom: sh(14),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: s(10) },
+    shadowOpacity: 0.5,
+    shadowRadius: s(20),
+    elevation: 12,
   },
-  minimalBottom: {
+  minimalSpeedBarTrack: {
+    width: sw(180),
+    height: sh(6),
+    backgroundColor: 'rgba(46, 74, 100, 0.5)',
+    borderRadius: sh(3),
+    overflow: 'hidden',
+    marginTop: sh(10),
+  },
+  minimalSpeedBarFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: C.cyan,
+    borderRadius: sh(3),
+  },
+  minimalBattSection: {
     alignItems: 'center',
-    gap: s(8),
+    marginTop: sh(20),
+    width: sw(280),
+  },
+  minimalBattRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: sh(6),
+  },
+  minimalBattTrack: {
+    width: '100%',
+    height: sh(8),
+    backgroundColor: 'rgba(46, 74, 100, 0.5)',
+    borderRadius: sh(4),
+    overflow: 'hidden',
+  },
+  minimalBattFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: sh(4),
   },
   minimalBig: {
     fontFamily: FONTS.display,
-    fontSize: sf(22),
+    fontSize: sf(27.5),
     color: C.white,
   },
   minimalUnit: {
@@ -1375,6 +1457,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: sw(8),
+    paddingBottom: sh(65),
     gap: sh(6),
   },
   techBody: {
@@ -1384,7 +1467,8 @@ const styles = StyleSheet.create({
   },
   techPanel: {
     flex: 1,
-    overflow: 'hidden',
+    overflow: 'visible',
+    paddingBottom: sh(10),
   },
   techHdr: {
     fontFamily: FONTS.mono,
@@ -1448,46 +1532,58 @@ const styles = StyleSheet.create({
 
   // ── Tooltip modal ─────────────────────────────────────────────────────────
   modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 200,
   },
   modalCard: {
-    backgroundColor: 'rgba(5,8,15,0.97)',
+    backgroundColor: 'rgba(20, 25, 40, 0.92)',
     borderWidth: 1,
-    borderColor: C.cyan,
-    padding: s(18),
-    width: sw(300),
-    borderRadius: s(4),
-    gap: s(8),
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    padding: s(24),
+    width: sw(320),
+    borderRadius: s(20),
+    gap: s(10),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: s(12) },
+    shadowOpacity: 0.5,
+    shadowRadius: s(24),
+    elevation: 16,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: s(10),
+    gap: s(12),
   },
   modalTitle: {
-    fontFamily: FONTS.display,
-    fontSize: sf(13),
-    color: C.cyan,
+    fontFamily: FONTS.mono,
+    fontSize: sf(15),
+    color: C.white,
     letterSpacing: 1,
     flex: 1,
   },
   modalDesc: {
     fontFamily: FONTS.mono,
-    fontSize: sf(11),
+    fontSize: sf(12),
     color: C.dimWhite,
-    lineHeight: sf(17),
+    lineHeight: sf(19),
   },
   modalDismiss: {
-    alignSelf: 'flex-end',
-    paddingTop: s(4),
+    alignSelf: 'center',
+    marginTop: s(8),
+    paddingVertical: sh(8),
+    paddingHorizontal: sw(28),
+    borderRadius: s(10),
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   modalDismissText: {
     fontFamily: FONTS.mono,
-    fontSize: sf(9),
-    color: C.muted,
+    fontSize: sf(11),
+    color: C.white,
     letterSpacing: 2,
   },
 

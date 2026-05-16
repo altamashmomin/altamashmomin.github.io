@@ -73,3 +73,13 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Secrets
+.env
+*.pem
+
+# Backups
+*.bak
+
+# Claude
+.claude/

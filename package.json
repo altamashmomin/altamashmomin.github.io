@@ -13,7 +13,12 @@
     "react": "19.2.3",
     "react-native": "0.85.3",
     "@react-native/new-app-screen": "0.85.3",
-    "react-native-safe-area-context": "^5.5.2"
+    "react-native-safe-area-context": "^5.5.2",
+    "react-native-vision-camera": "^4.3.0",
+    "react-native-keychain": "^8.1.0",
+    "axios": "^1.6.0",
+    "react-native-config": "^1.5.0",
+    "js-sha256": "^0.11.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -35,6 +40,9 @@
     "prettier": "2.8.8",
     "react-test-renderer": "19.2.3",
     "typescript": "^5.8.3"
+  },
+  "react-native": {
+    "assets": ["./assets/fonts/"]
   },
   "engines": {
     "node": ">= 22.11.0"
